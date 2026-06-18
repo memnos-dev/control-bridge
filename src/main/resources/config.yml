@@ -1,0 +1,13 @@
+# ControlBridge configuration.
+# Obtain the endpoint URL and token from your controller's admin dashboard.
+
+# WebSocket endpoint of the controller. Use wss:// in production.
+controller-url: "wss://your-controller.example/bridge"
+
+# Token issued by the controller; identifies this server. The controller resolves
+# all further context from it. Leave empty only for local dev against an
+# unauthenticated controller.
+auth-token: ""
+
+# Delay before reconnecting after a dropped connection.
+reconnect-delay-seconds: 5

@@ -1,0 +1,7 @@
+name: ControlBridge
+version: '${version}'
+
+main: dev.memnos.controlbridge.ControlBridgePlugin
+api-version: '26.1.2'
+load: POSTWORLD
+depend: [Citizens]
