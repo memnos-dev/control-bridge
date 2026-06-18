@@ -1,0 +1,24 @@
+# Build output
+build/
+.gradle/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Paper test-server runtime (world data, operator config, logs) — NEVER commit
+run/
+server.properties
+logs/
+*.log
+world/
+world_nether/
+world_the_end/
+
+# Local config holding real values (the default resource in src/ is committed; local copies are not)
+/config.yml
+
+# IDE / OS
+.idea/
+*.iml
+out/
+.DS_Store
+Thumbs.db
