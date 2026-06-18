@@ -1,3 +1,6 @@
+group = "dev.memnos"
+version = "0.1.0"
+
 plugins {
     id("java-library")
     id("com.gradleup.shadow") version "9.4.2"
@@ -25,7 +28,7 @@ java {
 
 tasks {
     runServer {
-        minecraftVersion("26.1.2")
+        minecraftVersion("26.2")
         jvmArgs("-Xms2G", "-Xmx2G")
     }
 
@@ -43,8 +46,18 @@ tasks {
         archiveClassifier.set("")
     }
 
+    // Copy the shaded plugin JAR into the local test server after every build.
+    // The path is environment-specific and stays out of the repo via a property
+    // with a sensible default (see gradle.properties).
+    register<Copy>("deployToTestServer") {
+        from(shadowJar)
+        into(providers.gradleProperty("testServerPluginsDir")
+            .getOrElse("C:/dev/mc-test-server/plugins"))
+    }
+
     // The plugin JAR users install is the shaded one.
     build {
         dependsOn(shadowJar)
+        finalizedBy("deployToTestServer")
     }
 }

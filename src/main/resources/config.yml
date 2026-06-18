@@ -11,3 +11,11 @@ auth-token: ""
 
 # Delay before reconnecting after a dropped connection.
 reconnect-delay-seconds: 5
+
+# Maximum distance (in blocks) a player may be from an NPC for their chat to
+# reach the controller. Chat outside this radius is never sent (cost discipline).
+proximity-radius: 16
+
+# Verbose wire-level logging for local debugging. Type-only (never payload or
+# player data), but noisy. Leave false on any public server.
+debug-wire-logging: false

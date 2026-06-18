@@ -8,25 +8,20 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Instant;
-import java.util.UUID;
 
 /**
- * Manages the single outbound WebSocket connection to the controller.
- *
- * Responsibilities in this slice: connect, send the handshake on open,
- * and reconnect after a drop. Inbound command dispatch and game actions
- * are added in the next slice.
+ * Manages the single outbound WebSocket connection to the controller: connect,
+ * handshake on open, dispatch inbound commands, reconnect on drop, and send
+ * outbound messages. Holds no game logic.
  */
 public final class BridgeClient {
-
-    private static final int SCHEMA_VERSION = 1;
 
     private final Plugin plugin;
     private final BridgeConfig config;
     private final String worldId;
     private final String adapterVersion;
 
+    private CommandDispatcher dispatcher;
     private WebSocketClient socket;
     private BukkitTask reconnectTask;
     private volatile boolean shuttingDown = false;
@@ -36,6 +31,11 @@ public final class BridgeClient {
         this.config = config;
         this.worldId = worldId;
         this.adapterVersion = adapterVersion;
+    }
+
+    /** Wire the dispatcher before connecting (breaks the construction cycle). */
+    public void attach(CommandDispatcher dispatcher) {
+        this.dispatcher = dispatcher;
     }
 
     /** Open the connection. Safe to call repeatedly (reconnect path). */
@@ -55,12 +55,14 @@ public final class BridgeClient {
             @Override
             public void onOpen(ServerHandshake handshakedata) {
                 plugin.getLogger().info("Connected to controller; sending handshake.");
-                sendHandshake();
+                BridgeClient.this.send(WireSender.handshake(config.authToken(), worldId, adapterVersion));
             }
 
             @Override
             public void onMessage(String message) {
-                // Inbound command dispatch is implemented in the next slice.
+                if (dispatcher != null) {
+                    dispatcher.onWireMessage(message);
+                }
             }
 
             @Override
@@ -71,24 +73,40 @@ public final class BridgeClient {
 
             @Override
             public void onError(Exception ex) {
-                // Do not log the exception message verbatim — it may contain the URL.
+                // Do not log the exception message verbatim - it may contain the URL.
                 plugin.getLogger().warning("Controller connection error; will retry.");
             }
         };
         socket.connect();
     }
 
-    private void sendHandshake() {
-        JsonObject msg = new JsonObject();
-        msg.addProperty("schema_version", SCHEMA_VERSION);
-        msg.addProperty("msg_id", UUID.randomUUID().toString());
-        msg.addProperty("ts", Instant.now().toString());
-        msg.addProperty("type", "plugin");
-        msg.addProperty("auth_token", config.authToken());
-        msg.addProperty("world_id", worldId);
-        msg.addProperty("adapter_version", adapterVersion);
-        // auth_token is part of the payload but is never written to any log.
-        socket.send(msg.toString());
+    /** Extract the message type for logging WITHOUT exposing payload/player data. */
+    private static String wireType(JsonObject msg) {
+        if (msg.has("command")) {
+            return msg.get("command").getAsString();
+        }
+        if (msg.has("event")) {
+            return msg.get("event").getAsString();
+        }
+        if (msg.has("type")) {
+            return msg.get("type").getAsString();
+        }
+        return "unknown";
+    }
+
+    /** Send an enveloped wire message. Type-only logging (no payload/player data). */
+    public void send(JsonObject msg) {
+        WebSocketClient s = socket;
+        boolean open = s != null && s.isOpen();
+        if (config.debugWireLogging()) {
+            plugin.getLogger().info("WIRE OUT: " + wireType(msg) + " open=" + open);
+        }
+        if (open) {
+            s.send(msg.toString());
+        } else {
+            plugin.getLogger().warning("WIRE OUT DROPPED: " + wireType(msg)
+                    + " socket=" + (s == null ? "null" : "closed"));
+        }
     }
 
     private void scheduleReconnect() {
