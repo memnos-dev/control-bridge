@@ -65,6 +65,10 @@ public final class CommandDispatcher {
                     str(msg, "npc_id"), str(msg, "player_id"),
                     str(msg, "prompt"), parseOptions(msg));
             case "show_disclosure" -> renderDisclosure(str(msg, "player_id"), str(msg, "text"));
+            case "npc_move" -> npcManager.move(
+                    str(msg, "npc_id"),
+                    dbl(msg, "x"), dbl(msg, "y"), dbl(msg, "z"),
+                    str(msg, "world_id"));
             default -> plugin.getLogger().warning("Unknown command from controller: " + command);
         }
     }

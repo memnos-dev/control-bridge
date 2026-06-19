@@ -43,6 +43,13 @@ public final class BridgeClient {
         if (shuttingDown) {
             return;
         }
+        // Close any previous socket before opening a new one. Without this, a
+        // reconnect can leave an old connection alive alongside the new one,
+        // causing every inbound message to be dispatched twice.
+        if (socket != null) {
+            socket.close();
+            socket = null;
+        }
         final URI uri;
         try {
             uri = new URI(config.controllerUrl());

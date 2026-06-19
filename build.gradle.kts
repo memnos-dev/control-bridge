@@ -27,6 +27,12 @@ java {
 }
 
 tasks {
+    // The thin jar would overwrite the shaded jar (same name via archiveClassifier="").
+    // We only ship the shaded jar, so disable the plain jar entirely.
+    jar {
+        enabled = false
+    }
+
     runServer {
         minecraftVersion("26.2")
         jvmArgs("-Xms2G", "-Xmx2G")

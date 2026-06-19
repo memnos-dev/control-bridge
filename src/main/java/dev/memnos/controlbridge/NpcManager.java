@@ -165,4 +165,22 @@ public final class NpcManager {
         }
         return Bukkit.getWorld(worldId);
     }
+
+    /** Move an NPC toward a target via Citizens pathfinding. Pure mechanism:
+     *  the plugin only forwards the target; Citizens computes the path. An
+     *  unreachable target makes the navigator give up (NPC stops) — no teleport. */
+    public void move(String npcId, double x, double y, double z, String worldId) {
+        NPC npc = index.get(npcId);
+        if (npc == null || !npc.isSpawned() || npc.getEntity() == null) {
+            plugin.getLogger().warning("Move skipped for " + npcId + ": not present.");
+            return;
+        }
+        World world = resolveWorld(worldId);
+        if (world == null) {
+            plugin.getLogger().warning("Move skipped for " + npcId + ": world not found.");
+            return;
+        }
+        npc.getNavigator().setTarget(new Location(world, x, y, z)); // coords never logged
+        plugin.getLogger().info("Move dispatched for " + npcId);
+    }
 }
