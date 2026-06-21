@@ -49,7 +49,6 @@ public final class CommandDispatcher {
             plugin.getLogger().info("WIRE IN: " + command);
         }
         plugin.getServer().getScheduler().runTask(plugin, () -> handle(command, msg));
-        plugin.getServer().getScheduler().runTask(plugin, () -> handle(command, msg));
     }
 
     private void handle(String command, JsonObject msg) {
