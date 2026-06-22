@@ -22,13 +22,15 @@ public final class CommandDispatcher {
     private final Plugin plugin;
     private final NpcManager npcManager;
     private final ChoiceRenderer choiceRenderer;
+    private final BridgeClient client;
     private final boolean debugWireLogging;
 
     public CommandDispatcher(Plugin plugin, NpcManager npcManager,
-                             ChoiceRenderer choiceRenderer, boolean debugWireLogging) {
+                             ChoiceRenderer choiceRenderer, BridgeClient client, boolean debugWireLogging) {
         this.plugin = plugin;
         this.npcManager = npcManager;
         this.choiceRenderer = choiceRenderer;
+        this.client = client;
         this.debugWireLogging = debugWireLogging;
     }
 
@@ -69,6 +71,7 @@ public final class CommandDispatcher {
                     dbl(msg, "x"), dbl(msg, "y"), dbl(msg, "z"),
                     str(msg, "world_id"));
             default -> plugin.getLogger().warning("Unknown command from controller: " + command);
+            case "item_transfer" -> handleItemTransfer(msg);
         }
     }
 
@@ -124,5 +127,51 @@ public final class CommandDispatcher {
 
     private static double dbl(JsonObject o, String field) {
         return o.get(field).getAsDouble();
+    }
+
+    /**
+     * GIVE/TAKE on the player inventory. Pure mechanism, no consent logic (that lives
+     * server-side; the dev tool bypasses it). Already on the main thread (dispatcher
+     * hops there), so NO runTask here. Always sends exactly one result.
+     */
+    private void handleItemTransfer(JsonObject msg) {
+        String correlationId = str(msg, "msg_id");   // result echoes the command's msg_id
+        String playerId = str(msg, "player_id");
+        String itemType = str(msg, "item_type");
+        int count = msg.get("count").getAsInt();
+        String direction = str(msg, "direction");
+
+        Player player = playerById(playerId);
+        if (player == null) {
+            client.send(WireSender.itemTransferResult(correlationId, false, "player_not_found"));
+            return;
+        }
+
+        org.bukkit.Material material = org.bukkit.Material.matchMaterial(itemType);
+        if (material == null) {
+            client.send(WireSender.itemTransferResult(correlationId, false, "unknown_item_type"));
+            return;
+        }
+
+        org.bukkit.inventory.ItemStack stack = new org.bukkit.inventory.ItemStack(material, count);
+        boolean success;
+        String reason;
+
+        if ("give".equals(direction)) {
+            // addItem returns the leftover that did not fit (inventory full).
+            boolean leftover = !player.getInventory().addItem(stack).isEmpty();
+            success = !leftover;
+            reason = leftover ? "inventory_full" : null;
+        } else if ("take".equals(direction)) {
+            // removeItem returns what could NOT be removed (player lacked enough).
+            boolean leftover = !player.getInventory().removeItem(stack).isEmpty();
+            success = !leftover;
+            reason = leftover ? "insufficient_items" : null;
+        } else {
+            success = false;
+            reason = "unknown_direction";
+        }
+
+        client.send(WireSender.itemTransferResult(correlationId, success, reason));
     }
 }

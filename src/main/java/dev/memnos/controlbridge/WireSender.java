@@ -66,4 +66,17 @@ public final class WireSender {
         msg.addProperty("presented_at", presentedAt.toString());
         return msg;
     }
+
+    /** item_transfer result. Strict contract: correlation_id + success + reason ONLY. */
+    public static JsonObject itemTransferResult(String correlationId, boolean success, String reason) {
+        JsonObject msg = envelope();           // sets schema_version, msg_id, ts
+        msg.addProperty("correlation_id", correlationId);
+        msg.addProperty("success", success);
+        if (reason != null) {
+            msg.addProperty("reason", reason);
+        }
+        // NOTE: no "type"/"command"/"event" field — Python correlates on correlation_id
+        // and has extra="forbid". Do NOT add a discriminator here.
+        return msg;
+    }
 }
