@@ -183,4 +183,33 @@ public final class NpcManager {
         npc.getNavigator().setTarget(new Location(world, x, y, z)); // coords never logged
         plugin.getLogger().info("Move dispatched for " + npcId);
     }
+
+    /**
+     * Cheap situational snapshot for one NPC (CC-WO-03): canonical time-of-day +
+     * players within the proximity radius, same world. Empty if the NPC is absent
+     * (unknown id or not yet materialised). Owns the Citizens/Bukkit reads (ADR-002 E1).
+     * Proximity filter mirrors resolveAudience("nearby").
+     */
+    public Optional<WorldQueryResult> observe(String npcId) {
+        NPC npc = index.get(npcId);
+        if (npc == null || !npc.isSpawned() || npc.getEntity() == null) {
+            return Optional.empty();
+        }
+        Location loc = npc.getEntity().getLocation();
+        World world = loc.getWorld();
+        if (world == null) {
+            return Optional.empty();
+        }
+        int minuteOfDay = WorldQueryResult.minuteOfDay(world.getTime());
+        List<WorldQueryResult.NearbyPlayer> nearby = new ArrayList<>();
+        for (Player p : world.getPlayers()) {
+            double d = p.getLocation().distance(loc);
+            if (d <= radius) {
+                Location pl = p.getLocation();
+                nearby.add(new WorldQueryResult.NearbyPlayer(
+                        p.getUniqueId().toString(), d, pl.getX(), pl.getY(), pl.getZ()));
+            }
+        }
+        return Optional.of(new WorldQueryResult(minuteOfDay, nearby));
+    }
 }

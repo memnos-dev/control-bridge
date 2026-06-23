@@ -23,14 +23,16 @@ public final class CommandDispatcher {
     private final NpcManager npcManager;
     private final ChoiceRenderer choiceRenderer;
     private final BridgeClient client;
+    private final WorldQueryHandler worldQueryHandler;
     private final boolean debugWireLogging;
 
     public CommandDispatcher(Plugin plugin, NpcManager npcManager,
-                             ChoiceRenderer choiceRenderer, BridgeClient client, boolean debugWireLogging) {
+                             ChoiceRenderer choiceRenderer, BridgeClient client, WorldQueryHandler worldQueryHandler, boolean debugWireLogging) {
         this.plugin = plugin;
         this.npcManager = npcManager;
         this.choiceRenderer = choiceRenderer;
         this.client = client;
+        this.worldQueryHandler = worldQueryHandler;
         this.debugWireLogging = debugWireLogging;
     }
 
@@ -70,8 +72,9 @@ public final class CommandDispatcher {
                     str(msg, "npc_id"),
                     dbl(msg, "x"), dbl(msg, "y"), dbl(msg, "z"),
                     str(msg, "world_id"));
-            default -> plugin.getLogger().warning("Unknown command from controller: " + command);
             case "item_transfer" -> handleItemTransfer(msg);
+            case "world_query" -> worldQueryHandler.handle(msg);
+            default -> plugin.getLogger().warning("Unknown command from controller: " + command);
         }
     }
 

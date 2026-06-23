@@ -1,6 +1,7 @@
 package dev.memnos.controlbridge;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -77,6 +78,29 @@ public final class WireSender {
         }
         // NOTE: no "type"/"command"/"event" field — Python correlates on correlation_id
         // and has extra="forbid". Do NOT add a discriminator here.
+        return msg;
+    }
+
+    /**
+     * world_query result. Correlates on correlation_id, NO discriminator (Python has
+     * extra="forbid"), same convention as itemTransferResult. nearby_players is an array
+     * of {player_id, distance, x, y, z}; numbers via addProperty (locale-independent).
+     */
+    public static JsonObject worldQueryResult(String correlationId, WorldQueryResult result) {
+        JsonObject msg = envelope();                       // schema_version, msg_id, ts
+        msg.addProperty("correlation_id", correlationId);
+        msg.addProperty("minute_of_day", result.minuteOfDay());
+        JsonArray players = new JsonArray();
+        for (WorldQueryResult.NearbyPlayer p : result.nearbyPlayers()) {
+            JsonObject o = new JsonObject();
+            o.addProperty("player_id", p.playerId());
+            o.addProperty("distance", p.distance());
+            o.addProperty("x", p.x());
+            o.addProperty("y", p.y());
+            o.addProperty("z", p.z());
+            players.add(o);
+        }
+        msg.add("nearby_players", players);
         return msg;
     }
 }

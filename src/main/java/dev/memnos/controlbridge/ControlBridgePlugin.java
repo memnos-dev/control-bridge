@@ -37,8 +37,9 @@ public final class ControlBridgePlugin extends JavaPlugin {
 
         client = new BridgeClient(this, config, worldId, ADAPTER_VERSION);
         ChoiceRenderer choiceRenderer = new ChoiceRenderer(this, client);
+        WorldQueryHandler worldQueryHandler = new WorldQueryHandler(this, npcManager, client);
         CommandDispatcher dispatcher = new CommandDispatcher(
-                this, npcManager, choiceRenderer, client, config.debugWireLogging());
+                this, npcManager, choiceRenderer, client, worldQueryHandler, config.debugWireLogging());
         client.attach(dispatcher);
 
         getServer().getPluginManager().registerEvents(
