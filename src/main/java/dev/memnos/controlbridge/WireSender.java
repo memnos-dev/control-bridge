@@ -57,6 +57,17 @@ public final class WireSender {
         return msg;
     }
 
+    /** player_approach. Fired once on the outside→inside-radius transition (NPC-local). */
+    public static JsonObject playerApproach(UUID playerUuid, String npcId, double distance) {
+        JsonObject msg = envelope();
+        msg.addProperty("event", "player_approach");
+        msg.addProperty("player_id", playerUuid.toString());
+        msg.addProperty("player_uuid", playerUuid.toString());
+        msg.addProperty("npc_id", npcId);
+        msg.addProperty("distance", distance);
+        return msg;
+    }
+
     /** player_choice. presented_at is the timestamp captured when choices were shown. */
     public static JsonObject playerChoice(String playerId, String npcId, String choiceId, Instant presentedAt) {
         JsonObject msg = envelope();

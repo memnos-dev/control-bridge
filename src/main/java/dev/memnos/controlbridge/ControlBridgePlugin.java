@@ -49,6 +49,13 @@ public final class ControlBridgePlugin extends JavaPlugin {
         // Rebuild the id<->NPC index on the next tick, after Citizens has loaded
         // its NPCs (the trait persists across restarts, ADR-002 E3).
         getServer().getScheduler().runTask(this, npcManager::rebuildIndex);
+        // Reactive approach detection: poll once per second on the main thread
+        // (Citizens/location reads are not thread-safe). Edge-triggered + radius-gated.
+        getServer().getScheduler().runTaskTimer(this, () -> {
+            for (NpcManager.Approach a : npcManager.scanApproaches()) {
+                client.send(WireSender.playerApproach(a.playerUuid(), a.npcId(), a.distance()));
+            }
+        }, 20L, 20L);
 
         getLogger().info("ControlBridge enabled; connecting to controller.");
     }

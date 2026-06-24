@@ -10,12 +10,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Owns every Citizens call (ADR-002 E1 encapsulation boundary). All methods run
@@ -36,11 +31,39 @@ public final class NpcManager {
     private final Map<String, NPC> index = new HashMap<>();
     // npc_id -> last player who spoke to it (resolves the "direct" audience).
     private final Map<String, UUID> lastInteractor = new HashMap<>();
+    // (npcId|playerUuid) currently inside radius — for outside→inside edge detection.
+    private final Set<String> inside = new HashSet<>();
+
+    public record Approach(UUID playerUuid, String npcId, double distance) {}
 
     public NpcManager(Plugin plugin, double radius, boolean debugWireLogging) {
         this.plugin = plugin;
         this.radius = radius;
         this.debugWireLogging = debugWireLogging;
+    }
+
+    /** Players who just crossed into an NPC's radius this scan. Pure-ish: mutates `inside`. */
+    public List<Approach> scanApproaches() {
+        List<Approach> crossed = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Map.Entry<String, NPC> e : index.entrySet()) {
+            String npcId = e.getKey();
+            NPC npc = e.getValue();
+            if (npc.getEntity() == null) continue;
+            Location nloc = npc.getEntity().getLocation();
+            if (nloc.getWorld() == null) continue;
+            for (Player p : nloc.getWorld().getPlayers()) {
+                double d = p.getLocation().distance(nloc);
+                if (d > radius) continue;
+                String key = npcId + "|" + p.getUniqueId();
+                seen.add(key);
+                if (inside.add(key)) {                 // add() == true → was outside
+                    crossed.add(new Approach(p.getUniqueId(), npcId, d));
+                }
+            }
+        }
+        inside.retainAll(seen);                        // left radius / logged out → reset
+        return crossed;
     }
 
     /** Rebuild the id<->NPC index by scanning Citizens for the identity trait. */
