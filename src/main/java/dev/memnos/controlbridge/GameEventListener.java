@@ -47,7 +47,11 @@ public final class GameEventListener implements Listener {
             }
             NpcManager.NearestNpc target = nearest.get();
             npcManager.recordInteractor(target.npcId(), uuid);
-            client.send(WireSender.playerChat(uuid, target.npcId(), text, target.distance()));
+
+            long dayTicks = player.getWorld().getTime() % 24000L;
+            int minuteOfDay = (int) (((dayTicks * 1440L) / 24000L + 360L) % 1440L);
+
+            client.send(WireSender.playerChat(uuid, target.npcId(), text, target.distance(), minuteOfDay));
         });
     }
 }

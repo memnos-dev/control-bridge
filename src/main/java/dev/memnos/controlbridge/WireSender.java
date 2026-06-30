@@ -46,7 +46,7 @@ public final class WireSender {
     }
 
     /** player_chat. Sent only when the player is within proximity (ADR-002 E4). */
-    public static JsonObject playerChat(UUID playerUuid, String npcId, String message, double distance) {
+    public static JsonObject playerChat(UUID playerUuid, String npcId, String message, double distance, int minuteOfDay) {
         JsonObject msg = envelope();
         msg.addProperty("event", "player_chat");
         msg.addProperty("player_id", playerUuid.toString());
@@ -54,6 +54,7 @@ public final class WireSender {
         msg.addProperty("npc_id", npcId);
         msg.addProperty("message", message);
         msg.addProperty("distance", distance);
+        msg.addProperty("minute_of_day", minuteOfDay);
         return msg;
     }
 
