@@ -8,6 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
@@ -205,6 +206,31 @@ public final class NpcManager {
         }
         npc.getNavigator().setTarget(new Location(world, x, y, z)); // coords never logged
         plugin.getLogger().info("Move dispatched for " + npcId);
+    }
+
+    /** Materialize an NPC at a target position (catch-up placement).
+     *  Counterpart to move(): teleport loads target chunks and bypasses the
+     *  navigator's give-up on unreachable targets. A despawned NPC is spawned
+     *  directly at the target instead. */
+    public void place(String npcId, double x, double y, double z, String worldId) {
+        NPC npc = index.get(npcId);
+        if (npc == null) {
+            plugin.getLogger().warning("Place skipped for " + npcId + ": unknown NPC.");
+            return;
+        }
+        World world = resolveWorld(worldId);
+        if (world == null) {
+            plugin.getLogger().warning("Place skipped for " + npcId + ": world not found.");
+            return;
+        }
+        Location target = new Location(world, x, y, z); // coords never logged
+        if (!npc.isSpawned()) {
+            npc.spawn(target);
+        } else {
+            npc.getNavigator().cancelNavigation();
+            npc.teleport(target, PlayerTeleportEvent.TeleportCause.PLUGIN);
+        }
+        plugin.getLogger().info("Place dispatched for " + npcId);
     }
 
     /**

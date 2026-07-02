@@ -72,6 +72,10 @@ public final class CommandDispatcher {
                     str(msg, "npc_id"),
                     dbl(msg, "x"), dbl(msg, "y"), dbl(msg, "z"),
                     str(msg, "world_id"));
+            case "npc_place" -> npcManager.place(
+                    str(msg, "npc_id"),
+                    dbl(msg, "x"), dbl(msg, "y"), dbl(msg, "z"),
+                    str(msg, "world_id"));
             case "item_transfer" -> handleItemTransfer(msg);
             case "world_query" -> worldQueryHandler.handle(msg);
             default -> plugin.getLogger().warning("Unknown command from controller: " + command);
