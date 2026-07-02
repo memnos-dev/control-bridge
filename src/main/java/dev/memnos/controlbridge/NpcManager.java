@@ -233,6 +233,7 @@ public final class NpcManager {
                         p.getUniqueId().toString(), d, pl.getX(), pl.getY(), pl.getZ()));
             }
         }
-        return Optional.of(new WorldQueryResult(minuteOfDay, nearby));
+        return Optional.of(new WorldQueryResult(minuteOfDay, nearby,
+                loc.getX(), loc.getY(), loc.getZ()));
     }
 }

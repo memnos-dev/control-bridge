@@ -102,6 +102,10 @@ public final class WireSender {
         JsonObject msg = envelope();                       // schema_version, msg_id, ts
         msg.addProperty("correlation_id", correlationId);
         msg.addProperty("minute_of_day", result.minuteOfDay());
+        msg.addProperty("npc_x", result.npcX());
+        msg.addProperty("npc_y", result.npcY());
+        msg.addProperty("npc_z", result.npcZ());
+
         JsonArray players = new JsonArray();
         for (WorldQueryResult.NearbyPlayer p : result.nearbyPlayers()) {
             JsonObject o = new JsonObject();

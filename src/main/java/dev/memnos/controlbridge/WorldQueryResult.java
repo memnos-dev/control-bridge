@@ -8,7 +8,8 @@ import java.util.List;
  * forbids extra fields, so no discriminator). minute_of_day is the canonical, game-
  * neutral 24h clock; the Python Core derives the day phase (CC-WO-01).
  */
-public record WorldQueryResult(int minuteOfDay, List<NearbyPlayer> nearbyPlayers) {
+public record WorldQueryResult(int minuteOfDay, List<NearbyPlayer> nearbyPlayers,
+                               double npcX, double npcY, double npcZ) {
 
     public record NearbyPlayer(String playerId, double distance, double x, double y, double z) {
     }
