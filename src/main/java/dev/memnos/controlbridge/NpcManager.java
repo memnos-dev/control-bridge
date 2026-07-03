@@ -262,4 +262,9 @@ public final class NpcManager {
         return Optional.of(new WorldQueryResult(minuteOfDay, nearby,
                 loc.getX(), loc.getY(), loc.getZ()));
     }
+
+    /** Number of indexed NPCs; used for restart-visibility logging. */
+    public int indexSize() {
+        return index.size();
+    }
 }

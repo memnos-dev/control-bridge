@@ -3,6 +3,10 @@ package dev.memnos.controlbridge;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.trait.TraitInfo;
 import org.bukkit.plugin.java.JavaPlugin;
+import net.citizensnpcs.api.event.CitizensEnableEvent;
+import net.citizensnpcs.api.event.CitizensReloadEvent;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 
 /**
  * Plugin entry point. Loads configuration, registers the identity trait, wires
@@ -46,9 +50,25 @@ public final class ControlBridgePlugin extends JavaPlugin {
                 new GameEventListener(this, client, npcManager), this);
 
         client.connect();
-        // Rebuild the id<->NPC index on the next tick, after Citizens has loaded
-        // its NPCs (the trait persists across restarts, ADR-002 E3).
-        getServer().getScheduler().runTask(this, npcManager::rebuildIndex);
+        // Rebuild the id<->NPC index when Citizens signals its NPCs are loaded
+        // (restart-safe; a fixed next-tick rebuild races Citizens' own load).
+        // CitizensReloadEvent covers /citizens reload. Index size is logged so an
+        // empty index is visible, never silent (ADR-002 E3).
+                getServer().getPluginManager().registerEvents(new Listener() {
+                    @EventHandler
+                    public void onCitizensEnable(CitizensEnableEvent event) {
+                        npcManager.rebuildIndex();
+                        getLogger().info("NPC index rebuilt (Citizens enabled): "
+                                + npcManager.indexSize() + " NPC(s).");
+                    }
+
+                    @EventHandler
+                    public void onCitizensReload(CitizensReloadEvent event) {
+                        npcManager.rebuildIndex();
+                        getLogger().info("NPC index rebuilt (Citizens reloaded): "
+                                + npcManager.indexSize() + " NPC(s).");
+                    }
+                }, this);
         // Reactive approach detection: poll once per second on the main thread
         // (Citizens/location reads are not thread-safe). Edge-triggered + radius-gated.
         getServer().getScheduler().runTaskTimer(this, () -> {
