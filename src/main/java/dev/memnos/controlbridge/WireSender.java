@@ -119,4 +119,13 @@ public final class WireSender {
         msg.add("nearby_players", players);
         return msg;
     }
+
+    /** disclosure_ack. Echoes the version shown so core can prove WHICH text was acked (ADR-027 E3). */
+    public static JsonObject disclosureAck(String playerId, String disclosureVersion) {
+        JsonObject msg = envelope();
+        msg.addProperty("event", "disclosure_ack");
+        msg.addProperty("player_id", playerId);
+        msg.addProperty("disclosure_version", disclosureVersion);
+        return msg;
+    }
 }

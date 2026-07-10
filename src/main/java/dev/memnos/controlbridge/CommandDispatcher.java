@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -67,7 +68,15 @@ public final class CommandDispatcher {
             case "present_choices" -> choiceRenderer.present(
                     str(msg, "npc_id"), str(msg, "player_id"),
                     str(msg, "prompt"), parseOptions(msg));
-            case "show_disclosure" -> renderDisclosure(str(msg, "player_id"), str(msg, "text"));
+            case "show_disclosure" -> {
+                boolean requireAck = msg.has("require_ack") && msg.get("require_ack").getAsBoolean();
+                renderDisclosure(
+                        str(msg, "player_id"), str(msg, "text"),
+                        requireAck,
+                        requireAck ? str(msg, "disclosure_version") : "",
+                        requireAck ? str(msg, "ack_text") : "",
+                        requireAck ? str(msg, "ack_confirmation_text") : "");
+            }
             case "npc_move" -> npcManager.move(
                     str(msg, "npc_id"),
                     dbl(msg, "x"), dbl(msg, "y"), dbl(msg, "z"),
@@ -97,10 +106,26 @@ public final class CommandDispatcher {
         }
     }
 
-    private void renderDisclosure(String playerId, String text) {
+    private void renderDisclosure(
+            String playerId, String text,
+            boolean requireAck, String disclosureVersion, String ackText,
+            String ackConfirmationText) {
         Player p = playerById(playerId);
-        if (p != null) {
-            p.sendMessage(Component.text(text)); // AI Act Art. 50 wording owned by core
+        if (p == null) {
+            return;
+        }
+        p.sendMessage(Component.text(text)); // AI Act Art. 50 wording owned by core
+        if (requireAck) {
+            // Adventure callback defaults (single-use, limited lifetime) are fine here:
+            // the ack is idempotent server-side, and while the flag is missing the next
+            // session re-renders this line anyway (ADR-027 E3).
+            Component ackLine = Component.text("» " + ackText)
+                    .clickEvent(ClickEvent.callback(audience -> {
+                        client.send(WireSender.disclosureAck(playerId, disclosureVersion));
+                        // Confirmation wording owned by core, same as the notice itself.
+                        audience.sendMessage(Component.text(ackConfirmationText));
+                    }));
+            p.sendMessage(ackLine);
         }
     }
 
