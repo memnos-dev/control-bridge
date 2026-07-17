@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Builds enveloped wire messages (ADR-002 E2). Pure construction, no I/O.
+ * Builds enveloped wire messages. Pure construction, no I/O.
  * Every outbound message carries schema_version / msg_id / ts. Numeric fields
  * use Gson's addProperty(Number), which is locale-independent (no "String.format").
  */
@@ -36,7 +36,7 @@ public final class WireSender {
         return msg;
     }
 
-    /** player_join. player_id is the canonical MC UUID (ADR-002 E3). */
+    /** player_join. player_id is the canonical MC UUID. */
     public static JsonObject playerJoin(UUID playerUuid) {
         JsonObject msg = envelope();
         msg.addProperty("event", "player_join");
@@ -45,7 +45,7 @@ public final class WireSender {
         return msg;
     }
 
-    /** player_chat. Sent only when the player is within proximity (ADR-002 E4). */
+    /** player_chat. Sent only when the player is within proximity. */
     public static JsonObject playerChat(UUID playerUuid, String npcId, String message, double distance, int minuteOfDay) {
         JsonObject msg = envelope();
         msg.addProperty("event", "player_chat");
@@ -120,12 +120,58 @@ public final class WireSender {
         return msg;
     }
 
-    /** disclosure_ack. Echoes the version shown so core can prove WHICH text was acked (ADR-027 E3). */
+    /**
+     * unknown_command error event. Correlates via the triggering command's
+     * msg_id — loud-failure channel for python-declared, java-missing
+     * handlers. Field shape mirrors memnos UnknownCommandMsg
+     * (extra="forbid" on the Python side: no additional fields).
+     */
+    public static JsonObject unknownCommand(String correlationId, String command) {
+        JsonObject msg = envelope();
+        msg.addProperty("correlation_id", correlationId);
+        msg.addProperty("error", "unknown_command");
+        msg.addProperty("command", command);
+        return msg;
+    }
+
+    /** disclosure_ack. Echoes the version shown so core can prove WHICH text was acked. */
     public static JsonObject disclosureAck(String playerId, String disclosureVersion) {
         JsonObject msg = envelope();
         msg.addProperty("event", "disclosure_ack");
         msg.addProperty("player_id", playerId);
         msg.addProperty("disclosure_version", disclosureVersion);
+        return msg;
+    }
+
+    /**
+     * npc_report (plugin -> core). Sent after every successful (re)connect,
+     * right after the handshake. IDs only — spawn positions come
+     * from the POI anchor, despawns need none.
+     */
+    public static JsonObject npcReport(java.util.Collection<String> npcIds) {
+        JsonObject msg = envelope();
+        msg.addProperty("event", "npc_report");
+        JsonArray ids = new JsonArray();
+        for (String id : npcIds) {
+            ids.add(id);
+        }
+        msg.add("npc_ids", ids);
+        return msg;
+    }
+
+    /**
+     * capability_report (plugin -> core). Sent after every successful
+     * (re)connect; standalone message so a future re-scan (e.g. on
+     * PluginEnable/DisableEvent) needs no reconnect.
+     */
+    public static JsonObject capabilityReport(java.util.Collection<String> capabilities) {
+        JsonObject msg = envelope();
+        msg.addProperty("event", "capability_report");
+        JsonArray caps = new JsonArray();
+        for (String c : capabilities) {
+            caps.add(c);
+        }
+        msg.add("capabilities", caps);
         return msg;
     }
 }

@@ -267,4 +267,10 @@ public final class NpcManager {
     public int indexSize() {
         return index.size();
     }
+
+    /** Immutable snapshot of indexed npc_ids for the connect report.
+     *  Main-thread only, like every other method here. */
+    public Set<String> indexedNpcIds() {
+        return Set.copyOf(index.keySet());
+    }
 }

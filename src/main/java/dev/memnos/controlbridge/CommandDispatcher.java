@@ -87,7 +87,13 @@ public final class CommandDispatcher {
                     str(msg, "world_id"));
             case "item_transfer" -> handleItemTransfer(msg);
             case "world_query" -> worldQueryHandler.handle(msg);
-            default -> plugin.getLogger().warning("Unknown command from controller: " + command);
+            case "npc_emote" -> renderEmote(str(msg, "npc_id"), str(msg, "text"), str(msg, "audience"));
+            default -> {
+                plugin.getLogger().warning("Unknown command from controller: " + command);
+                // Loud toward core, not just the local log: python-declared but
+                // java-missing handlers must surface as an operations fault.
+                client.send(WireSender.unknownCommand(str(msg, "msg_id"), command));
+            }
         }
     }
 
@@ -103,6 +109,15 @@ public final class CommandDispatcher {
         Component line = Component.text(npcManager.displayName(npcId) + " is thinking...");
         for (Player p : npcManager.resolveAudience(npcId, audience)) {
             p.sendActionBar(line);
+        }
+    }
+
+    private void renderEmote(String npcId, String text, String audience) {
+        // Third-person action line: "* Aldric waves *" — style distinct from
+        // say (no "Name: " prefix). text is a verb phrase without the NPC name.
+        Component line = Component.text("* " + npcManager.displayName(npcId) + " " + text + " *");
+        for (Player p : npcManager.resolveAudience(npcId, audience)) {
+            p.sendMessage(line);
         }
     }
 

@@ -45,6 +45,8 @@ public final class ControlBridgePlugin extends JavaPlugin {
         CommandDispatcher dispatcher = new CommandDispatcher(
                 this, npcManager, choiceRenderer, client, worldQueryHandler, config.debugWireLogging());
         client.attach(dispatcher);
+        client.attachNpcReportSource(npcManager::indexedNpcIds);
+
 
         getServer().getPluginManager().registerEvents(
                 new GameEventListener(this, client, npcManager), this);

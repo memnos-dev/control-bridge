@@ -20,6 +20,8 @@ public final class BridgeClient {
     private final BridgeConfig config;
     private final String worldId;
     private final String adapterVersion;
+    private static final int CLOSE_AUTH_REJECTED = 4401;
+    private java.util.function.Supplier<java.util.Set<String>> npcIdsSupplier;
 
     private CommandDispatcher dispatcher;
     private WebSocketClient socket;
@@ -36,6 +38,11 @@ public final class BridgeClient {
     /** Wire the dispatcher before connecting (breaks the construction cycle). */
     public void attach(CommandDispatcher dispatcher) {
         this.dispatcher = dispatcher;
+    }
+
+    /** Wire the npc_report source before connecting (same cycle-breaker as attach). */
+    public void attachNpcReportSource(java.util.function.Supplier<java.util.Set<String>> supplier) {
+        this.npcIdsSupplier = supplier;
     }
 
     /** Open the connection. Safe to call repeatedly (reconnect path). */
@@ -63,6 +70,18 @@ public final class BridgeClient {
             public void onOpen(ServerHandshake handshakedata) {
                 plugin.getLogger().info("Connected to controller; sending handshake.");
                 BridgeClient.this.send(WireSender.handshake(config.authToken(), worldId, adapterVersion));
+                // Connect reports. onOpen runs on the
+                // WebSocket thread; NpcManager is main-thread only and future
+                // contract-depth checks are too — hop before reading either.
+                // WebSocket frames are ordered per connection, so both reports
+                // arrive after the handshake; report order itself is irrelevant
+                // (both core subscribers upsert, no ordering assumption).
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    BridgeClient.this.send(WireSender.capabilityReport(CapabilityScanner.scan()));
+                    if (npcIdsSupplier != null) {
+                        BridgeClient.this.send(WireSender.npcReport(npcIdsSupplier.get()));
+                    }
+                });
             }
 
             @Override
@@ -74,6 +93,14 @@ public final class BridgeClient {
 
             @Override
             public void onClose(int code, String reason, boolean remote) {
+                if (code == CLOSE_AUTH_REJECTED) {
+                    plugin.getLogger().severe(
+                            "Auth token rejected (close code 4401). "
+                                    + "Check authToken in config.yml -- if the token was revoked, "
+                                    + "mint a new one. NOT reconnecting; fix the config, then "
+                                    + "restart the server or reload the plugin.");
+                    return;
+                }
                 plugin.getLogger().warning("Controller connection closed; scheduling reconnect.");
                 scheduleReconnect();
             }
