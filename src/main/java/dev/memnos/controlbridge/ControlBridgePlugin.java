@@ -60,6 +60,7 @@ public final class ControlBridgePlugin extends JavaPlugin {
                     @EventHandler
                     public void onCitizensEnable(CitizensEnableEvent event) {
                         npcManager.rebuildIndex();
+                        client.markIndexReady();
                         getLogger().info("NPC index rebuilt (Citizens enabled): "
                                 + npcManager.indexSize() + " NPC(s).");
                     }
@@ -67,6 +68,7 @@ public final class ControlBridgePlugin extends JavaPlugin {
                     @EventHandler
                     public void onCitizensReload(CitizensReloadEvent event) {
                         npcManager.rebuildIndex();
+                        client.markIndexReady();
                         getLogger().info("NPC index rebuilt (Citizens reloaded): "
                                 + npcManager.indexSize() + " NPC(s).");
                     }

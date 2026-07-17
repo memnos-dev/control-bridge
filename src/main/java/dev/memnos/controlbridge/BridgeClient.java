@@ -22,6 +22,7 @@ public final class BridgeClient {
     private final String adapterVersion;
     private static final int CLOSE_AUTH_REJECTED = 4401;
     private java.util.function.Supplier<java.util.Set<String>> npcIdsSupplier;
+    private volatile boolean indexReady = false;
 
     private CommandDispatcher dispatcher;
     private WebSocketClient socket;
@@ -70,18 +71,11 @@ public final class BridgeClient {
             public void onOpen(ServerHandshake handshakedata) {
                 plugin.getLogger().info("Connected to controller; sending handshake.");
                 BridgeClient.this.send(WireSender.handshake(config.authToken(), worldId, adapterVersion));
-                // Connect reports. onOpen runs on the
-                // WebSocket thread; NpcManager is main-thread only and future
-                // contract-depth checks are too — hop before reading either.
-                // WebSocket frames are ordered per connection, so both reports
-                // arrive after the handshake; report order itself is irrelevant
-                // (both core subscribers upsert, no ordering assumption).
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    BridgeClient.this.send(WireSender.capabilityReport(CapabilityScanner.scan()));
-                    if (npcIdsSupplier != null) {
-                        BridgeClient.this.send(WireSender.npcReport(npcIdsSupplier.get()));
-                    }
-                });
+                // Connect reports are gated on the NPC index (see sendConnectReports):
+                // at server start Citizens loads after connect, so the Citizens-enable
+                // handler triggers them; on a runtime reconnect the index is long ready
+                // and this call sends them immediately.
+                BridgeClient.this.sendConnectReports();
             }
 
             @Override
@@ -163,5 +157,28 @@ public final class BridgeClient {
             socket.close();
             socket = null;
         }
+    }
+
+    /** Send the connect reports once both conditions hold: socket open AND NPC index built.
+     *  Called from onOpen (reconnect during runtime) and from the Citizens-enable handler
+     *  (server start, where Citizens loads after connect). Idempotent by wire semantics:
+     *  a duplicate report yields an empty diff core-side (ADR-008). */
+    public void sendConnectReports() {
+        WebSocketClient s = socket;
+        if (!indexReady || s == null || !s.isOpen()) {
+            return;
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            send(WireSender.capabilityReport(CapabilityScanner.scan()));
+            if (npcIdsSupplier != null) {
+                send(WireSender.npcReport(npcIdsSupplier.get()));
+            }
+        });
+    }
+
+    /** The NPC index is built; reports may now reflect reality. */
+    public void markIndexReady() {
+        this.indexReady = true;
+        sendConnectReports();
     }
 }
