@@ -176,9 +176,22 @@ public final class BridgeClient {
         });
     }
 
-    /** The NPC index is built; reports may now reflect reality. */
+    /** The NPC index is built. First call opens the connection (deliberately gated:
+     *  the core must not be able to send commands against an empty index — a
+     *  npc_say in that window would vanish silently). Later calls (/citizens reload)
+     *  re-report the refreshed index over the existing connection. */
     public void markIndexReady() {
+        boolean first = !indexReady;
         this.indexReady = true;
-        sendConnectReports();
+        if (first) {
+            connect();
+        } else {
+            sendConnectReports();
+        }
+    }
+
+    /** Whether the NPC index was ever signalled ready (start-up fallback guard). */
+    public boolean isIndexReady() {
+        return indexReady;
     }
 }

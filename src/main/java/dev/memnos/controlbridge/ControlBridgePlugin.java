@@ -51,7 +51,6 @@ public final class ControlBridgePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new GameEventListener(this, client, npcManager), this);
 
-        client.connect();
         // Rebuild the id<->NPC index when Citizens signals its NPCs are loaded
         // (restart-safe; a fixed next-tick rebuild races Citizens' own load).
         // CitizensReloadEvent covers /citizens reload. Index size is logged so an
@@ -73,6 +72,27 @@ public final class ControlBridgePlugin extends JavaPlugin {
                                 + npcManager.indexSize() + " NPC(s).");
                     }
                 }, this);
+        // Citizens loads its NPCs during delayed init, AFTER our onEnable — so the
+        // CitizensEnableEvent handler above drives the connect. Two exceptions need
+        // catching here, or the bridge would never connect at all:
+        //   (a) the plugin was loaded against an already-running Citizens (no event
+        //       will fire again) -> a non-empty registry proves NPCs are loaded;
+        //   (b) anything else that swallows the event -> loud fallback, never silent.
+        if (CitizensAPI.getNPCRegistry().iterator().hasNext()) {
+            npcManager.rebuildIndex();
+            getLogger().info("Citizens NPCs already loaded: " + npcManager.indexSize() + " NPC(s).");
+            client.markIndexReady();
+        } else {
+            getServer().getScheduler().runTaskLater(this, () -> {
+                if (!client.isIndexReady()) {
+                    getLogger().warning("Citizens never signalled NPC load after 10s; "
+                            + "connecting with a rebuilt index anyway.");
+                    npcManager.rebuildIndex();
+                    client.markIndexReady();
+                }
+            }, 200L);
+        }
+
         // Reactive approach detection: poll once per second on the main thread
         // (Citizens/location reads are not thread-safe). Edge-triggered + radius-gated.
         getServer().getScheduler().runTaskTimer(this, () -> {
@@ -81,7 +101,7 @@ public final class ControlBridgePlugin extends JavaPlugin {
             }
         }, 20L, 20L);
 
-        getLogger().info("ControlBridge enabled; connecting to controller.");
+        getLogger().info("ControlBridge enabled; waiting for Citizens NPC load before connecting.");
     }
 
     @Override
