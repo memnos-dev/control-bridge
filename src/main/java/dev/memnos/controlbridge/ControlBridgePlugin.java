@@ -42,8 +42,9 @@ public final class ControlBridgePlugin extends JavaPlugin {
         client = new BridgeClient(this, config, worldId, ADAPTER_VERSION);
         ChoiceRenderer choiceRenderer = new ChoiceRenderer(this, client);
         WorldQueryHandler worldQueryHandler = new WorldQueryHandler(this, npcManager, client);
+        WorldScanHandler worldScanHandler = new WorldScanHandler(this, client, worldId);
         CommandDispatcher dispatcher = new CommandDispatcher(
-                this, npcManager, choiceRenderer, client, worldQueryHandler, config.debugWireLogging());
+                this, npcManager, choiceRenderer, client, worldQueryHandler, worldScanHandler, config.debugWireLogging());
         client.attach(dispatcher);
         client.attachNpcReportSource(npcManager::indexedNpcIds);
 

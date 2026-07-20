@@ -41,10 +41,11 @@ final class CapabilityScanner {
         caps.add("npc_move");
         caps.add("npc_place");
         caps.add("world_query");
+        caps.add("world_scan");
         caps.add("item_transfer");
         caps.add("present_choices");
         caps.add("disclosure_notice");
-        // NOT reported: world_scan (verb not built), player_info (no handler).
+        // NOT reported: player_info (no handler).
         // Conditional capabilities go below, contract-depth checked (see class doc).
         return caps;
     }

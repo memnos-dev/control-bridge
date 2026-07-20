@@ -25,15 +25,22 @@ public final class CommandDispatcher {
     private final ChoiceRenderer choiceRenderer;
     private final BridgeClient client;
     private final WorldQueryHandler worldQueryHandler;
+    private final WorldScanHandler worldScanHandler;
     private final boolean debugWireLogging;
 
-    public CommandDispatcher(Plugin plugin, NpcManager npcManager,
-                             ChoiceRenderer choiceRenderer, BridgeClient client, WorldQueryHandler worldQueryHandler, boolean debugWireLogging) {
+    public CommandDispatcher(Plugin plugin,
+                             NpcManager npcManager,
+                             ChoiceRenderer choiceRenderer,
+                             BridgeClient client,
+                             WorldQueryHandler worldQueryHandler,
+                             WorldScanHandler worldScanHandler,
+                             boolean debugWireLogging) {
         this.plugin = plugin;
         this.npcManager = npcManager;
         this.choiceRenderer = choiceRenderer;
         this.client = client;
         this.worldQueryHandler = worldQueryHandler;
+        this.worldScanHandler = worldScanHandler;
         this.debugWireLogging = debugWireLogging;
     }
 
@@ -87,6 +94,7 @@ public final class CommandDispatcher {
                     str(msg, "world_id"));
             case "item_transfer" -> handleItemTransfer(msg);
             case "world_query" -> worldQueryHandler.handle(msg);
+            case "world_scan" -> worldScanHandler.handle(msg);
             case "npc_emote" -> renderEmote(str(msg, "npc_id"), str(msg, "text"), str(msg, "audience"));
             default -> {
                 plugin.getLogger().warning("Unknown command from controller: " + command);

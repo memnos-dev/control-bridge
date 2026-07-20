@@ -121,6 +121,21 @@ public final class WireSender {
     }
 
     /**
+     * world_scan result. Correlates on correlation_id, NO discriminator (Python
+     * has extra="forbid") — same convention as worldQueryResult. candidates[]
+     * carries the PoiCandidateIn wire shape verbatim; bounds echoes the
+     * effective scan area (center_x, center_z, radius).
+     */
+    public static JsonObject worldScanResult(String correlationId,
+                                             JsonArray candidates, JsonObject bounds) {
+        JsonObject msg = envelope();
+        msg.addProperty("correlation_id", correlationId);
+        msg.add("candidates", candidates);
+        msg.add("bounds", bounds);
+        return msg;
+    }
+
+    /**
      * unknown_command error event. Correlates via the triggering command's
      * msg_id — loud-failure channel for python-declared, java-missing
      * handlers. Field shape mirrors memnos UnknownCommandMsg
