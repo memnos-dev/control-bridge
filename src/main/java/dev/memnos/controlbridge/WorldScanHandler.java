@@ -56,9 +56,9 @@ public final class WorldScanHandler {
 
         World world = plugin.getServer().getWorlds().get(0); // same binding as resolveWorldId()
         Location spawn = world.getSpawnLocation();
-        double centerX = msg.has("center_x") ? msg.get("center_x").getAsDouble() : spawn.getX();
-        double centerZ = msg.has("center_z") ? msg.get("center_z").getAsDouble() : spawn.getZ();
-        double radius = msg.has("radius") ? msg.get("radius").getAsDouble() : DEFAULT_RADIUS;
+        double centerX = hasNonNull(msg, "center_x") ? msg.get("center_x").getAsDouble() : spawn.getX();
+        double centerZ = hasNonNull(msg, "center_z") ? msg.get("center_z").getAsDouble() : spawn.getZ();
+        double radius = hasNonNull(msg, "radius") ? msg.get("radius").getAsDouble() : DEFAULT_RADIUS;
 
         JsonArray candidates = new JsonArray();
         int minChunkX = (int) Math.floor((centerX - radius) / 16.0);
@@ -205,5 +205,10 @@ public final class WorldScanHandler {
         c.add("position", position);
         c.add("raw_data", rawData);
         return c;
+    }
+
+    /** Wire contract: a bounds field that is absent OR JSON null counts as unset. */
+    private static boolean hasNonNull(JsonObject o, String field) {
+        return o.has(field) && !o.get(field).isJsonNull();
     }
 }
