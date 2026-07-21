@@ -124,14 +124,18 @@ public final class WireSender {
      * world_scan result. Correlates on correlation_id, NO discriminator (Python
      * has extra="forbid") — same convention as worldQueryResult. candidates[]
      * carries the PoiCandidateIn wire shape verbatim; bounds echoes the
-     * effective scan area (center_x, center_z, radius).
+     * effective scan area. mapImageBase64 is the optional top-down sketch
+     * (ADR-037 E4); null omits the field — pre-S4a cores would reject it.
      */
-    public static JsonObject worldScanResult(String correlationId,
-                                             JsonArray candidates, JsonObject bounds) {
+    public static JsonObject worldScanResult(String correlationId, JsonArray candidates,
+                                             JsonObject bounds, String mapImageBase64) {
         JsonObject msg = envelope();
         msg.addProperty("correlation_id", correlationId);
         msg.add("candidates", candidates);
         msg.add("bounds", bounds);
+        if (mapImageBase64 != null) {
+            msg.addProperty("map_image", mapImageBase64);
+        }
         return msg;
     }
 

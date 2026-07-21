@@ -23,6 +23,11 @@ import org.bukkit.ChunkSnapshot;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.data.BlockData;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Base64;
+import javax.imageio.ImageIO;
 
 /**
  * Handles inbound "world_scan": scans a bounded area of the primary
@@ -186,6 +191,7 @@ public final class WorldScanHandler {
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             final JsonArray workstations = scanWorkstations(snapshots, minY, maxY);
+            final String mapImage = renderSketch(snapshots, centerX, centerZ, radius, minY);
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 for (JsonElement e : workstations) {
                     if (candidates.size() >= MAX_CANDIDATES) {
@@ -202,7 +208,7 @@ public final class WorldScanHandler {
                 bounds.addProperty("center_x", centerX);
                 bounds.addProperty("center_z", centerZ);
                 bounds.addProperty("radius", radius);
-                client.send(WireSender.worldScanResult(correlationId, candidates, bounds));
+                client.send(WireSender.worldScanResult(correlationId, candidates, bounds, mapImage));
             });
         });
     }
@@ -378,5 +384,111 @@ public final class WorldScanHandler {
             }
         }
         return out;
+    }
+
+    /** Runs OFF the main thread on immutable ChunkSnapshots. Renders the exact
+     *  bounds square (center +/- radius) so the frontend anchors the image with
+     *  x=center_x-radius, y=center_z-radius, w=h=2*radius — no offset math.
+     *  Any failure returns null: the scan must never die for a sketch. */
+    private String renderSketch(java.util.List<ChunkSnapshot> snapshots,
+                                double centerX, double centerZ, double radius, int minWorldY) {
+        try {
+            final int size = (int) Math.ceil(radius * 2.0);
+            final int scale = 1; //size > 512 ? 1 : 2; // cap image edge at ~1024 px
+            final int minBX = (int) Math.floor(centerX - radius);
+            final int minBZ = (int) Math.floor(centerZ - radius);
+
+            java.util.Map<Long, ChunkSnapshot> byChunk = new java.util.HashMap<>();
+            for (ChunkSnapshot s : snapshots) {
+                byChunk.put(chunkKey(s.getX(), s.getZ()), s);
+            }
+
+            int[][] heights = new int[size][size];
+            int[][] colors = new int[size][size];
+            for (int dx = 0; dx < size; dx++) {
+                for (int dz = 0; dz < size; dz++) {
+                    int wx = minBX + dx;
+                    int wz = minBZ + dz;
+                    ChunkSnapshot s = byChunk.get(chunkKey(wx >> 4, wz >> 4));
+                    if (s == null) { // outside the ticketed chunk box (corner rounding)
+                        colors[dx][dz] = 0x101418;
+                        heights[dx][dz] = Integer.MIN_VALUE;
+                        continue;
+                    }
+                    int lx = wx & 15;
+                    int lz = wz & 15;
+                    int y = s.getHighestBlockYAt(lx, lz);
+                    Material m = s.getBlockType(lx, y, lz);
+                    if (m.isAir() && y > minWorldY) { // API version quirk: highest may point above
+                        y -= 1;
+                        m = s.getBlockType(lx, y, lz);
+                    }
+                    colors[dx][dz] = baseColor(m);
+                    heights[dx][dz] = y;
+                }
+            }
+
+            BufferedImage img = new BufferedImage(size * scale, size * scale,
+                    BufferedImage.TYPE_INT_RGB);
+            for (int dx = 0; dx < size; dx++) {
+                for (int dz = 0; dz < size; dz++) {
+                    int rgb = shade(colors[dx][dz], heights[dx][dz],
+                            dz > 0 ? heights[dx][dz - 1] : heights[dx][dz]);
+                    for (int px = 0; px < scale; px++) {
+                        for (int pz = 0; pz < scale; pz++) {
+                            // world x -> image x, world z -> image y (north up, no flip —
+                            // same axis convention as PoiMap's SVG).
+                            img.setRGB(dx * scale + px, dz * scale + pz, rgb);
+                        }
+                    }
+                }
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(img, "png", out);
+            return Base64.getEncoder().encodeToString(out.toByteArray());
+        } catch (IOException | RuntimeException e) {
+            plugin.getLogger().warning("world_scan sketch render failed; sending scan without map.");
+            return null;
+        }
+    }
+
+    private static long chunkKey(int cx, int cz) {
+        return ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
+    }
+
+    /** Classic map-style slope shading: higher than the northern neighbor reads
+     *  brighter, lower reads darker, flat stays. */
+    private static int shade(int rgb, int y, int northY) {
+        if (y == Integer.MIN_VALUE) {
+            return rgb; // out-of-box background, no shading
+        }
+        double f = y > northY ? 1.15 : (y < northY ? 0.78 : 1.0);
+        int r = Math.min(255, (int) (((rgb >> 16) & 0xFF) * f));
+        int g = Math.min(255, (int) (((rgb >> 8) & 0xFF) * f));
+        int b = Math.min(255, (int) ((rgb & 0xFF) * f));
+        return (r << 16) | (g << 8) | b;
+    }
+
+    /** Coarse material -> color for a schematic sketch — readable, not pretty.
+     *  Tag groups first, then name heuristics, then neutral gray. */
+    private static int baseColor(Material m) {
+        if (m == Material.WATER) return 0x3B6BD1;
+        if (m == Material.LAVA) return 0xD96C2C;
+        if (m == Material.GRASS_BLOCK) return 0x6DA24A;
+        if (Tag.LEAVES.isTagged(m)) return 0x2E5D2E;
+        if (Tag.LOGS.isTagged(m)) return 0x5C4326;
+        if (Tag.SAND.isTagged(m)) return 0xD7CD8F;
+        if (Tag.PLANKS.isTagged(m)) return 0x9C7B4D;
+        if (Tag.ICE.isTagged(m)) return 0xA8C8E8;
+        String n = m.name();
+        if (n.contains("SNOW")) return 0xE8ECEF;
+        if (n.contains("STONE") || n.contains("COBBLE") || n.contains("DEEPSLATE")
+                || n.contains("ANDESITE") || n.contains("GRAVEL")) return 0x7E7E7E;
+        if (n.contains("DIRT") || n.contains("PATH") || n.contains("FARMLAND")
+                || n.contains("MUD") || n.contains("PODZOL")) return 0x8A6844;
+        if (n.contains("TERRACOTTA") || n.contains("BRICK")) return 0xA5593F;
+        if (n.contains("SEAGRASS") || n.contains("KELP") || n.contains("LILY")) return 0x3B6BD1;
+        return 0x8A8A8A;
     }
 }
